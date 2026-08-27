@@ -29,6 +29,7 @@ html, body { width: 100%; height: 100%; background-color: transparent !important
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('id') || 'default';
 const storageKey = `splat_xp_data_${roomId}`;
+const channelName = `splat_xp_bc_${roomId}`;
 
 function adjustFontSize() {
   const container = document.getElementById('mainContainer');
@@ -60,26 +61,24 @@ function applyState(data) {
   adjustFontSize();
 }
 
-// 最後に保存されたデータを即座に読み込む
+// 最後に保存されたローカルデータを即時表示
 const saved = localStorage.getItem(storageKey);
 if (saved) {
   try { applyState(JSON.parse(saved)); } catch(e){}
 }
 
-// PeerJS リアルタイム接続
+// BroadcastChannel による即時受信
+const bc = new BroadcastChannel(channelName);
+bc.onmessage = (e) => applyState(e.data);
+
+// PeerJS によるP2P受信
 const peer = new Peer();
-peer.on('open', () => {
-  connectToController();
-});
+peer.on('open', () => connectToController());
 
 function connectToController() {
   const conn = peer.connect(`splat-xp-ctrl-${roomId}`);
-  conn.on('data', (data) => {
-    applyState(data);
-  });
-  conn.on('close', () => {
-    setTimeout(connectToController, 3000);
-  });
+  conn.on('data', (data) => applyState(data));
+  conn.on('close', () => setTimeout(connectToController, 3000));
 }
 
 document.fonts.ready.then(adjustFontSize);
