@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>XP Counter Controller</title>
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
 body { background: #1e1e24; color: #fff; padding: 12px; }
@@ -39,7 +38,7 @@ select { flex: 1; cursor: pointer; }
   background: #007bff; color: #fff; border: none; padding: 4px 10px; font-size: 11px; font-weight: bold;
   border-radius: 4px; cursor: pointer; white-space: nowrap;
 }
-.status { font-size: 10px; color: #aaa; text-align: right; }
+.status { font-size: 10px; color: #00ff66; text-align: right; }
 </style>
 </head>
 <body>
@@ -50,7 +49,7 @@ select { flex: 1; cursor: pointer; }
       <input type="text" id="overlayUrlInput" readonly>
       <button class="copy-btn" onclick="copyUrl()">URLコピー</button>
     </div>
-    <div class="status" id="statusText">接続準備中...</div>
+    <div class="status">通信機能: 正常（ローカル即時同期）</div>
   </div>
 
   <div class="row" style="margin-top:5px;">
@@ -87,25 +86,23 @@ select { flex: 1; cursor: pointer; }
 </div>
 
 <script>
-// --- IDの判定ロジック修正 ---
+// ID判定
 const urlParams = new URLSearchParams(window.location.search);
 let roomId = urlParams.get('id');
 
 if (!roomId) {
-  // localStorageに保存されているか確認、なければ新規生成
   roomId = localStorage.getItem('splat_xp_my_room_id');
   if (!roomId) {
     roomId = Math.random().toString(36).substring(2, 10);
     localStorage.setItem('splat_xp_my_room_id', roomId);
   }
-  // URLにIDを付与してリロードなしで履歴置換
   const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?id=' + roomId;
   window.history.replaceState({path: newUrl}, '', newUrl);
 } else {
   localStorage.setItem('splat_xp_my_room_id', roomId);
 }
 
-// 配信画面用URLの生成
+// OBS表示用URLのセット
 const overlayUrl = `${window.location.origin}${window.location.pathname.replace('control.html', 'overlay.html')}?id=${roomId}`;
 document.getElementById('overlayUrlInput').value = overlayUrl;
 
@@ -118,46 +115,20 @@ function copyUrl() {
 
 const storageKey = `splat_xp_data_${roomId}`;
 const channelName = `splat_xp_bc_${roomId}`;
-const bc = new BroadcastChannel(channelName);
+let bc = null;
 
-let state = { xp: 2000, font: "'Russo One', sans-serif", color: "#00ff66", bgData: "" };
+try {
+  bc = new BroadcastChannel(channelName);
+} catch(e) {}
 
-// PeerJS 設定
-const peer = new Peer(`splat-xp-ctrl-${roomId}`);
-let connections = [];
-
-peer.on('open', () => {
-  document.getElementById('statusText').innerText = '準備完了';
-  loadSavedState();
-});
-
-peer.on('connection', (conn) => {
-  connections.push(conn);
-  document.getElementById('statusText').innerText = '画面と接続中';
-  
-  // 接続完了時に現在の状態を送る
-  conn.on('open', () => {
-    conn.send(state);
-  });
-  
-  conn.on('close', () => {
-    connections = connections.filter(c => c !== conn);
-    if(connections.length === 0) document.getElementById('statusText').innerText = '待機中';
-  });
-});
+let state = { xp: 2000, font: "'Russo One', sans-serif", color: "#00ff66", bgData: "", _ts: Date.now() };
 
 function saveAndSendState() {
+  state._ts = Date.now(); // タイムスタンプを入れて毎回の更新を確定させる
   localStorage.setItem(storageKey, JSON.stringify(state));
-  
-  // 1. 同一ブラウザ/OBS内の BroadcastChannel 送信
-  try { bc.postMessage(state); } catch(e){}
-  
-  // 2. WebRTC Peer 経由の送信
-  connections.forEach(conn => {
-    if (conn && conn.open) {
-      conn.send(state);
-    }
-  });
+  if (bc) {
+    try { bc.postMessage(state); } catch(e){}
+  }
 }
 
 function loadSavedState() {
@@ -165,9 +136,9 @@ function loadSavedState() {
   if (saved) {
     try {
       state = JSON.parse(saved);
-      document.getElementById('directInput').value = state.xp;
-      document.getElementById('fontSelect').value = state.font;
-      document.getElementById('colorPicker').value = state.color;
+      document.getElementById('directInput').value = state.xp || 2000;
+      if(state.font) document.getElementById('fontSelect').value = state.font;
+      if(state.color) document.getElementById('colorPicker').value = state.color;
     } catch(e) {}
   }
   saveAndSendState();
@@ -175,7 +146,7 @@ function loadSavedState() {
 
 function updateXP(direction) {
   const step = parseFloat(document.getElementById('stepInput').value) || 0;
-  state.xp += step * direction;
+  state.xp = (parseFloat(state.xp) || 0) + (step * direction);
   document.getElementById('directInput').value = state.xp;
   saveAndSendState();
 }
