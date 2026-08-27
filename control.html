@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>XP Counter Controller</title>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
 body { background: #1e1e24; color: #fff; padding: 12px; }
@@ -25,7 +26,6 @@ select { flex: 1; cursor: pointer; }
 .file-btn { font-size: 11px; flex: 1; }
 .clear-btn { background: #555; color: #ccc; padding: 4px 8px; font-size: 11px; border: none; border-radius: 4px; cursor: pointer; }
 
-/* URL自動生成エリア */
 .url-box {
   background: #111116; border: 1px solid #333; padding: 8px; border-radius: 6px;
   display: flex; flex-direction: column; gap: 6px; margin-top: 5px;
@@ -39,7 +39,7 @@ select { flex: 1; cursor: pointer; }
   background: #007bff; color: #fff; border: none; padding: 4px 10px; font-size: 11px; font-weight: bold;
   border-radius: 4px; cursor: pointer; white-space: nowrap;
 }
-.copy-btn:active { transform: scale(0.95); }
+.status { font-size: 10px; color: #aaa; text-align: right; }
 </style>
 </head>
 <body>
@@ -50,6 +50,7 @@ select { flex: 1; cursor: pointer; }
       <input type="text" id="overlayUrlInput" readonly>
       <button class="copy-btn" onclick="copyUrl()">URLコピー</button>
     </div>
+    <div class="status" id="statusText">通信接続中...</div>
   </div>
 
   <div class="row" style="margin-top:5px;">
@@ -86,7 +87,6 @@ select { flex: 1; cursor: pointer; }
 </div>
 
 <script>
-// IDの自動生成と取得
 const urlParams = new URLSearchParams(window.location.search);
 let roomId = urlParams.get('id');
 
@@ -103,27 +103,38 @@ function copyUrl() {
   const input = document.getElementById('overlayUrlInput');
   input.select();
   navigator.clipboard.writeText(input.value);
-  alert('OBS用のURLをコピーしました！ブラウザソースに貼り付けてください。');
+  alert('OBS用のURLをコピーしました！');
 }
 
-const channel = new BroadcastChannel(`splat_xp_channel_${roomId}`);
 const storageKey = `splat_xp_data_${roomId}`;
+let state = { xp: 2000, font: "'Russo One', sans-serif", color: "#00ff66", bgData: "" };
 
-// デフォルト状態
-let state = {
-  xp: 2000,
-  font: "'Russo One', sans-serif",
-  color: "#00ff66",
-  bgData: ""
-};
+const peer = new Peer(`splat-xp-ctrl-${roomId}`);
+let connections = [];
 
-// データの自動保存処理
+peer.on('open', () => {
+  document.getElementById('statusText').innerText = '準備完了';
+  loadSavedState();
+});
+
+peer.on('connection', (conn) => {
+  connections.push(conn);
+  document.getElementById('statusText').innerText = '画面と接続中';
+  conn.on('open', () => {
+    conn.send(state);
+  });
+  conn.on('close', () => {
+    connections = connections.filter(c => c !== conn);
+  });
+});
+
 function saveAndSendState() {
   localStorage.setItem(storageKey, JSON.stringify(state));
-  channel.postMessage(state);
+  connections.forEach(conn => {
+    if (conn.open) conn.send(state);
+  });
 }
 
-// データの初期ロード処理（保存データの復元）
 function loadSavedState() {
   const saved = localStorage.getItem(storageKey);
   if (saved) {
@@ -177,8 +188,9 @@ document.getElementById('imageLoader').addEventListener('change', function(e) {
   }
 });
 
-// 起動時に保存データを読み込み
-window.onload = loadSavedState;
+// BroadcastChannelとの相互バックアップ
+const bc = new BroadcastChannel(`splat_xp_channel_${roomId}`);
+bc.onmessage = (e) => {};
 </script>
 </body>
 </html>
