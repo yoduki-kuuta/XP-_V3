@@ -61,7 +61,7 @@ function applyState(data) {
   adjustFontSize();
 }
 
-// 最後に保存されたローカルデータを即時表示
+// 保存済みデータの読み込み
 const saved = localStorage.getItem(storageKey);
 if (saved) {
   try { applyState(JSON.parse(saved)); } catch(e){}
@@ -71,14 +71,34 @@ if (saved) {
 const bc = new BroadcastChannel(channelName);
 bc.onmessage = (e) => applyState(e.data);
 
-// PeerJS によるP2P受信
-const peer = new Peer();
+// PeerJS による P2P 受信設定
+let peer = new Peer();
+let activeConn = null;
+
 peer.on('open', () => connectToController());
 
 function connectToController() {
+  if (activeConn && activeConn.open) return;
+  
   const conn = peer.connect(`splat-xp-ctrl-${roomId}`);
-  conn.on('data', (data) => applyState(data));
-  conn.on('close', () => setTimeout(connectToController, 3000));
+  
+  conn.on('open', () => {
+    activeConn = conn;
+  });
+  
+  conn.on('data', (data) => {
+    applyState(data);
+  });
+  
+  conn.on('close', () => {
+    activeConn = null;
+    setTimeout(connectToController, 3000);
+  });
+  
+  conn.on('error', () => {
+    activeConn = null;
+    setTimeout(connectToController, 3000);
+  });
 }
 
 document.fonts.ready.then(adjustFontSize);
