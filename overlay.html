@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Splatoon XP Counter Overlay</title>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@1,700&family=M+PLUS+Rounded+1c:wght@900&family=Montserrat:ital,wght@1,900&family=Orbitron:wght@900&family=Russo+One&display=swap" rel="stylesheet">
@@ -27,8 +28,6 @@ html, body { width: 100%; height: 100%; background-color: transparent !important
 <script>
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('id') || 'default';
-
-const channel = new BroadcastChannel(`splat_xp_channel_${roomId}`);
 const storageKey = `splat_xp_data_${roomId}`;
 
 function adjustFontSize() {
@@ -57,28 +56,33 @@ function applyState(data) {
     img.style.display = 'none';
     img.src = '';
   }
+  localStorage.setItem(storageKey, JSON.stringify(data));
   adjustFontSize();
 }
 
-// データ受信時
-channel.onmessage = (event) => {
-  applyState(event.data);
-};
+// 最後に保存されたデータを即座に読み込む
+const saved = localStorage.getItem(storageKey);
+if (saved) {
+  try { applyState(JSON.parse(saved)); } catch(e){}
+}
 
-// 画面読み込み時に保存済みデータを直接確認して表示
-function loadSavedState() {
-  const saved = localStorage.getItem(storageKey);
-  if (saved) {
-    try {
-      applyState(JSON.parse(saved));
-    } catch(e) {}
-  } else {
-    adjustFontSize();
-  }
+// PeerJS リアルタイム接続
+const peer = new Peer();
+peer.on('open', () => {
+  connectToController();
+});
+
+function connectToController() {
+  const conn = peer.connect(`splat-xp-ctrl-${roomId}`);
+  conn.on('data', (data) => {
+    applyState(data);
+  });
+  conn.on('close', () => {
+    setTimeout(connectToController, 3000);
+  });
 }
 
 document.fonts.ready.then(adjustFontSize);
-window.onload = loadSavedState;
 </script>
 </body>
 </html>
