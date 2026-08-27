@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>Splatoon XP Counter Overlay</title>
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@1,700&family=M+PLUS+Rounded+1c:wght@900&family=Montserrat:ital,wght@1,900&family=Orbitron:wght@900&family=Russo+One&display=swap" rel="stylesheet">
@@ -47,8 +46,8 @@ function adjustFontSize() {
 function applyState(data) {
   if (!data) return;
   document.getElementById('xpDisplay').innerText = `XP ${data.xp}`;
-  document.getElementById('xpDisplay').style.fontFamily = data.font;
-  document.getElementById('xpDisplay').style.color = data.color;
+  if(data.font) document.getElementById('xpDisplay').style.fontFamily = data.font;
+  if(data.color) document.getElementById('xpDisplay').style.color = data.color;
   const img = document.getElementById('bgImage');
   if (data.bgData) {
     img.src = data.bgData;
@@ -57,49 +56,34 @@ function applyState(data) {
     img.style.display = 'none';
     img.src = '';
   }
-  localStorage.setItem(storageKey, JSON.stringify(data));
   adjustFontSize();
 }
 
-// 保存済みデータの読み込み
-const saved = localStorage.getItem(storageKey);
-if (saved) {
-  try { applyState(JSON.parse(saved)); } catch(e){}
+function loadState() {
+  const saved = localStorage.getItem(storageKey);
+  if (saved) {
+    try { applyState(JSON.parse(saved)); } catch(e){}
+  }
 }
 
-// BroadcastChannel による即時受信
-const bc = new BroadcastChannel(channelName);
-bc.onmessage = (e) => applyState(e.data);
+// 1. 初期読み込み
+loadState();
 
-// PeerJS による P2P 受信設定
-let peer = new Peer();
-let activeConn = null;
+// 2. BroadcastChannel 受信
+try {
+  const bc = new BroadcastChannel(channelName);
+  bc.onmessage = (e) => applyState(e.data);
+} catch(e){}
 
-peer.on('open', () => connectToController());
+// 3. StorageEvent 受信（OBSドックからのリアルタイムデータ変更検知）
+window.addEventListener('storage', (e) => {
+  if (e.key === storageKey && e.newValue) {
+    try { applyState(JSON.parse(e.newValue)); } catch(err){}
+  }
+});
 
-function connectToController() {
-  if (activeConn && activeConn.open) return;
-  
-  const conn = peer.connect(`splat-xp-ctrl-${roomId}`);
-  
-  conn.on('open', () => {
-    activeConn = conn;
-  });
-  
-  conn.on('data', (data) => {
-    applyState(data);
-  });
-  
-  conn.on('close', () => {
-    activeConn = null;
-    setTimeout(connectToController, 3000);
-  });
-  
-  conn.on('error', () => {
-    activeConn = null;
-    setTimeout(connectToController, 3000);
-  });
-}
+// 4. 定期ポーリング（万が一の補完用）
+setInterval(loadState, 1000);
 
 document.fonts.ready.then(adjustFontSize);
 </script>
