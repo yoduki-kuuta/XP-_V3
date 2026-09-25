@@ -19,22 +19,28 @@ select { flex: 1; cursor: pointer; }
   padding: 8px 12px; font-size: 14px; font-weight: bold; border-radius: 6px;
   border: none; cursor: pointer; color: white; transition: transform 0.1s;
 }
-.btn:active { transform: scale(0.95); }
+.btn:active { transform: scale(0.97); }
 
-/* ▼ 加算・減算ボタンの大型化設定 */
+/* ▼ 加算・減算ボタンの縦並び＆超大型化設定 */
+.btn-row {
+  display: flex;
+  flex-direction: column; /* 縦並びに変更 */
+  gap: 10px;
+  margin-top: 5px;
+}
 .btn-add { 
   background-color: #28a745; 
-  flex: 1; 
-  font-size: 20px; 
-  padding: 16px 20px; 
-  min-height: 60px;
+  width: 100%;
+  height: 80px;          /* ボタンの高さを拡大 */
+  font-size: 24px;       /* 文字を大きく */
+  border-radius: 8px;
 }
 .btn-sub { 
   background-color: #dc3545; 
-  flex: 1; 
-  font-size: 20px; 
-  padding: 16px 20px; 
-  min-height: 60px;
+  width: 100%;
+  height: 80px;          /* ボタンの高さを拡大 */
+  font-size: 24px;       /* 文字を大きく */
+  border-radius: 8px;
 }
 
 .file-btn { font-size: 11px; flex: 1; }
@@ -67,11 +73,13 @@ select { flex: 1; cursor: pointer; }
     <div class="status">通信機能: 正常（ローカル即時同期）</div>
   </div>
 
-  <div class="row" style="margin-top:5px;">
-    <button class="btn btn-add" onclick="updateXP(1)">+ 加算</button>
-    <button class="btn btn-sub" onclick="updateXP(-1)">- 減算</button>
+  <!-- ボタン領域（縦並び） -->
+  <div class="btn-row">
+    <button class="btn btn-add" onclick="updateXP(1)">＋ 加算</button>
+    <button class="btn btn-sub" onclick="updateXP(-1)">－ 減算</button>
   </div>
-  <div class="row">
+
+  <div class="row" style="margin-top: 5px;">
     <label>増減値:</label>
     <input type="number" id="stepInput" value="10" step="1">
   </div>
