@@ -20,8 +20,23 @@ select { flex: 1; cursor: pointer; }
   border: none; cursor: pointer; color: white; transition: transform 0.1s;
 }
 .btn:active { transform: scale(0.95); }
-.btn-add { background-color: #28a745; flex: 1; }
-.btn-sub { background-color: #dc3545; flex: 1; }
+
+/* ▼ 加算・減算ボタンの大型化設定 */
+.btn-add { 
+  background-color: #28a745; 
+  flex: 1; 
+  font-size: 20px; 
+  padding: 16px 20px; 
+  min-height: 60px;
+}
+.btn-sub { 
+  background-color: #dc3545; 
+  flex: 1; 
+  font-size: 20px; 
+  padding: 16px 20px; 
+  min-height: 60px;
+}
+
 .file-btn { font-size: 11px; flex: 1; }
 .clear-btn { background: #555; color: #ccc; padding: 4px 8px; font-size: 11px; border: none; border-radius: 4px; cursor: pointer; }
 
